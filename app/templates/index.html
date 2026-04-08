@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white rounded-lg shadow-md p-8">
+        <h2 class="text-3xl font-bold text-gray-800 mb-2">Convert Audio to Text</h2>
+        <p class="text-gray-600 mb-6">Upload M4A or MP3 files and get instant transcriptions powered by OpenAI Whisper</p>
+
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+            <p class="text-sm text-gray-700">
+                <strong class="block mb-2">✓ Supported formats:</strong>
+                <span class="inline-block">MP3, M4A, WAV, WebM</span><br>
+                <strong class="block mt-2 mb-2">✓ Maximum file size:</strong>
+                <span class="inline-block">200 MB</span><br>
+                <strong class="block mt-2 mb-2">✓ Processing time:</strong>
+                <span class="inline-block">~1 minute per 10 minutes of audio</span>
+            </p>
+        </div>
+
+        <form method="POST" action="{{ url_for('main.upload') }}" enctype="multipart/form-data" id="upload-form">
+            {{ form.hidden_tag() }}
+
+            <!-- File Input with Drag & Drop -->
+            <div class="mb-6">
+                {{ form.audio_file.label(class="block text-gray-700 font-semibold mb-3") }}
+
+                <div id="drop-zone" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition duration-200 bg-gray-50">
+                    <div id="drop-content">
+                        <svg class="mx-auto h-12 w-12 text-gray-400 mb-2" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-12l-3.172-3.172a4 4 0 00-5.656 0L28 12M9 20H7m2 0a2 2 0 100-4 2 2 0 000 4z"></path>
+                        </svg>
+                        <p class="text-gray-700 font-medium mb-1">Drag and drop your audio file here</p>
+                        <p class="text-gray-500 text-sm mb-3">or click to select from your computer</p>
+                    </div>
+
+                    {{ form.audio_file(
+                        class="file-input",
+                        id="audio-file-input",
+                        accept=".mp3,.m4a,.wav,.webm"
+                    ) }}
+                </div>
+
+                {% if form.audio_file.errors %}
+                    <p class="text-red-500 text-sm mt-2 flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18.101 12.93l-6.63-9.868A1 1 0 0010 2a1 1 0 00-.471.138L2.999 12.93a1 1 0 00.471 1.862h14.06a1 1 0 00.471-1.862z" clip-rule="evenodd"></path>
+                        </svg>
+                        {{ form.audio_file.errors[0] }}
+                    </p>
+                {% endif %}
+
+                <!-- File info display -->
+                <div id="file-info" class="hidden mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <p class="text-sm"><strong>Selected file:</strong> <span id="file-name"></span></p>
+                    <p class="text-sm"><strong>File size:</strong> <span id="file-size"></span></p>
+                </div>
+            </div>
+
+            <!-- Language Selector -->
+            <div class="mb-6">
+                {{ form.language.label(class="block text-gray-700 font-semibold mb-3") }}
+                {{ form.language(class="block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                <p class="text-xs text-gray-500 mt-2">Leave blank to auto-detect the language</p>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex gap-4">
+                {{ form.submit(
+                    class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 cursor-pointer",
+                    id="submit-btn"
+                ) }}
+            </div>
+
+            <!-- Progress Indicator -->
+            <div id="progress-container" class="hidden mt-6">
+                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div id="progress-bar" class="bg-gradient-to-r from-blue-600 to-blue-700 h-3 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                </div>
+                <p id="progress-text" class="text-sm text-gray-600 mt-3 text-center font-medium">Uploading and processing...</p>
+            </div>
+        </form>
+    </div>
+
+    <!-- Info Section -->
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-lg p-6 shadow">
+            <div class="flex items-center mb-3">
+                <svg class="w-6 h-6 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                    <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000-2A4 4 0 000 5v10a4 4 0 004 4h12a4 4 0 004-4V5a4 4 0 00-4-4 1 1 0 000 2 2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-800">1. Upload</h3>
+            </div>
+            <p class="text-gray-600 text-sm">Select your audio file (MP3, M4A, WAV, or WebM)</p>
+        </div>
+
+        <div class="bg-white rounded-lg p-6 shadow">
+            <div class="flex items-center mb-3">
+                <svg class="w-6 h-6 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a1 1 0 001 1h12a1 1 0 001-1V6a2 2 0 00-2-2H4zm12 12H4a2 2 0 01-2-2v-4a1 1 0 00-1-1H0v6a2 2 0 002 2h16a2 2 0 002-2v-6h-1a1 1 0 00-1 1v4a2 2 0 01-2 2z" clip-rule="evenodd"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-800">2. Process</h3>
+            </div>
+            <p class="text-gray-600 text-sm">We'll transcribe your audio using OpenAI Whisper</p>
+        </div>
+
+        <div class="bg-white rounded-lg p-6 shadow">
+            <div class="flex items-center mb-3">
+                <svg class="w-6 h-6 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-800">3. Download</h3>
+            </div>
+            <p class="text-gray-600 text-sm">View and download your transcript as text</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // DOM elements
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('audio-file-input');
+    const fileInfo = document.getElementById('file-info');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+    const form = document.getElementById('upload-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+
+    // Drag and drop handlers
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('dragover');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            updateFileInfo(files[0]);
+        }
+    });
+
+    // File input change handler
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            updateFileInfo(e.target.files[0]);
+        }
+    });
+
+    // Update file info display
+    function updateFileInfo(file) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        fileName.textContent = file.name;
+        fileSize.textContent = sizeMB + ' MB';
+        fileInfo.classList.remove('hidden');
+
+        // Validate file size
+        if (file.size > 200 * 1024 * 1024) {
+            fileSize.parentElement.classList.add('text-red-600');
+            fileSize.textContent += ' (Too large!)';
+            submitBtn.disabled = true;
+        } else {
+            fileSize.parentElement.classList.remove('text-red-600');
+            submitBtn.disabled = false;
+        }
+    }
+
+    // Show progress on submit
+    form.addEventListener('submit', function() {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+        progressContainer.classList.remove('hidden');
+        dropZone.classList.add('opacity-50', 'pointer-events-none');
+
+        // Simulate progress
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += Math.random() * 20;
+            if (progress > 90) progress = 90;
+            progressBar.style.width = progress + '%';
+
+            if (progress >= 85) {
+                progressText.textContent = 'Finalizing transcript...';
+            }
+        }, 500);
+    });
+</script>
+{% endblock %}

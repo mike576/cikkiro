@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Success Message -->
+    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded flex items-center">
+        <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+        </svg>
+        <div>
+            <p class="font-bold">Transcription Complete!</p>
+            <p class="text-sm">File: <strong>{{ filename }}</strong> ({{ file_size_mb }} MB) | Language: <strong>{{ language }}</strong></p>
+        </div>
+    </div>
+
+    <!-- Transcription Result -->
+    <div class="bg-white rounded-lg shadow-md p-8 mb-6">
+        <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
+            <h2 class="text-2xl font-bold text-gray-800">Transcription Result</h2>
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="copyToClipboard()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition duration-150 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M8 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm4 0a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1z"></path>
+                    </svg>
+                    Copy
+                </button>
+                <button onclick="downloadTranscript()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded transition duration-150 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                    Download
+                </button>
+            </div>
+        </div>
+
+        <!-- Transcript Box -->
+        <div class="border border-gray-200 rounded-lg p-6 bg-gray-50 max-h-96 overflow-y-auto mb-4">
+            <pre id="transcript-text" class="whitespace-pre-wrap text-gray-800 font-mono text-sm leading-relaxed">{{ transcript }}</pre>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <p class="text-gray-600 text-sm font-medium">Characters</p>
+                <p class="text-2xl font-bold text-blue-600">{{ transcript|length }}</p>
+            </div>
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <p class="text-gray-600 text-sm font-medium">Words</p>
+                <p class="text-2xl font-bold text-blue-600">{{ transcript.split()|length }}</p>
+            </div>
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <p class="text-gray-600 text-sm font-medium">File Size</p>
+                <p class="text-2xl font-bold text-blue-600">{{ file_size_mb }} MB</p>
+            </div>
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <p class="text-gray-600 text-sm font-medium">Language</p>
+                <p class="text-lg font-bold text-blue-600">{{ language }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-col md:flex-row gap-4">
+        <a href="{{ url_for('main.index') }}" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-150 text-center flex items-center justify-center">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            Transcribe Another File
+        </a>
+        <a href="{{ url_for('main.index') }}" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-150 text-center flex items-center justify-center">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000-2A4 4 0 000 5v10a4 4 0 004 4h12a4 4 0 004-4V5a4 4 0 00-4-4 1 1 0 000 2 2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd"></path>
+            </svg>
+            Upload Different File
+        </a>
+    </div>
+</div>
+
+<script>
+    function copyToClipboard() {
+        const text = document.getElementById('transcript-text').textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            // Show success message
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>Copied!';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+            }, 2000);
+        }).catch(err => {
+            alert('Failed to copy to clipboard');
+        });
+    }
+
+    function downloadTranscript() {
+        const text = document.getElementById('transcript-text').textContent;
+        const filename = '{{ filename }}'.replace(/\.[^.]*$/, '');
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}_transcript.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+</script>
+{% endblock %}
