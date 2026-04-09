@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+            <div>
+                <h2 class="text-4xl font-bold text-gray-800">AI Analysis Result</h2>
+                <p class="text-sm text-gray-600 mt-2">File: <strong>{{ filename }}</strong> | Model: <strong>{{ model }}</strong></p>
+            </div>
+            <div class="flex flex-col gap-2 w-full md:w-auto">
+                <a href="{{ url_for('main.result', transcript_id=transcript_id) }}"
+                   class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-semibold transition text-center">
+                    ← Try Another Prompt
+                </a>
+                <a href="{{ url_for('main.index') }}"
+                   class="inline-block bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg text-sm font-semibold transition text-center">
+                    + Upload New File
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Your Prompt -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5z"></path>
+                <path d="M3 7h14"></path>
+            </svg>
+            Your Prompt
+        </h3>
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+            <p class="text-gray-700 leading-relaxed">{{ prompt }}</p>
+        </div>
+    </div>
+
+    <!-- AI Response -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path>
+                </svg>
+                AI Response
+            </h3>
+            <button onclick="copyResponse()"
+                    id="copy-response-btn"
+                    class="inline-block bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm font-semibold transition whitespace-nowrap">
+                📋 Copy Response
+            </button>
+        </div>
+
+        <div class="border-2 border-gray-200 rounded-lg p-6 bg-gray-50">
+            <div id="llm-response" class="prose max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">{{ response }}</div>
+        </div>
+    </div>
+
+    <!-- Original Transcript (Collapsible) -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <details>
+            <summary class="text-lg font-semibold text-gray-800 cursor-pointer hover:text-blue-600 flex items-center py-2">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V8zm0 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z" clip-rule="evenodd"></path>
+                </svg>
+                View Original Transcript
+            </summary>
+            <div class="mt-4 border-2 border-gray-200 rounded-lg p-4 bg-gray-50 max-h-64 overflow-y-auto">
+                <pre class="whitespace-pre-wrap text-gray-700 text-sm font-mono leading-relaxed">{{ transcript }}</pre>
+            </div>
+        </details>
+    </div>
+</div>
+
+<script>
+    function copyResponse() {
+        const responseText = document.getElementById('llm-response').innerText;
+        navigator.clipboard.writeText(responseText).then(() => {
+            const btn = document.getElementById('copy-response-btn');
+            const originalText = btn.textContent;
+            btn.textContent = '✅ Copied!';
+            btn.classList.add('bg-green-600');
+            btn.classList.remove('bg-gray-600');
+
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.classList.remove('bg-green-600');
+                btn.classList.add('bg-gray-600');
+            }, 2000);
+        }).catch(err => {
+            alert('Failed to copy to clipboard');
+        });
+    }
+</script>
+{% endblock %}

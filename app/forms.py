@@ -1,8 +1,8 @@
 """Flask-WTF forms for file upload and authentication."""
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
-from wtforms import EmailField, PasswordField, SelectField, SubmitField
-from wtforms.validators import DataRequired, Email, Optional
+from wtforms import EmailField, PasswordField, SelectField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, Email, Optional, Length
 
 
 class LoginForm(FlaskForm):
@@ -57,3 +57,25 @@ class AudioUploadForm(FlaskForm):
     )
 
     submit = SubmitField("Transcribe")
+
+
+class AnalysisPromptForm(FlaskForm):
+    """Form for LLM analysis with user prompt."""
+
+    prompt = TextAreaField(
+        "Analysis Prompt",
+        validators=[
+            DataRequired(message="Please enter a prompt"),
+            Length(
+                min=10,
+                max=2000,
+                message="Prompt must be 10-2000 characters",
+            ),
+        ],
+        render_kw={
+            "placeholder": "E.g., Summarize this transcript in 3 bullet points...",
+            "rows": 4,
+        },
+    )
+
+    submit = SubmitField("Analyze with AI")

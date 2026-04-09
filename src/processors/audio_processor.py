@@ -67,10 +67,14 @@ class AudioProcessor:
             file_size_mb = audio_path.stat().st_size / (1024 * 1024)
 
             # Transcribe audio
-            transcript = self.openai_service.transcribe_audio(
-                file_path,
-                language=language,
-            )
+            # Only pass language if specified (avoid passing None to OpenAI API)
+            if language:
+                transcript = self.openai_service.transcribe_audio(
+                    file_path,
+                    language=language,
+                )
+            else:
+                transcript = self.openai_service.transcribe_audio(file_path)
 
             if not transcript or not transcript.strip():
                 raise AudioProcessingError("Transcription resulted in empty text")

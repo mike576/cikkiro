@@ -9,6 +9,10 @@ USERS = {
     "borbala.veres@gmail.com": {
         "password_hash": generate_password_hash("feketemacska"),
         "name": "Borbála Veres"
+    },
+    "miklos.toth83@gmail.com": {
+        "password_hash": generate_password_hash("feketemacska"),
+        "name": "Miklos Toth"
     }
 }
 

@@ -3,6 +3,8 @@
 import logging
 import os
 import tempfile
+import traceback
+from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
@@ -90,15 +92,29 @@ class OpenAIService:
                 )
             else:
                 # File is small enough, transcribe directly
-                with open(audio_path, "rb") as audio_file:
-                    transcript_response = self.client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_file,
-                        language=language,
-                        prompt=prompt,
-                        temperature=0,
-                    )
-                transcript_text = transcript_response.text
+                # Open file handle directly for Whisper API
+                audio_file = open(audio_path, "rb")
+
+                try:
+                    # Build parameters, only include optional ones if provided
+                    # Note: Whisper API does NOT support temperature parameter
+                    transcribe_params = {
+                        "model": "whisper-1",
+                        "file": audio_file,
+                    }
+                    if language:
+                        transcribe_params["language"] = language
+                    if prompt:
+                        transcribe_params["prompt"] = prompt
+
+                    # Log parameters being sent (excluding file object)
+                    log_params = {k: v for k, v in transcribe_params.items() if k != "file"}
+                    logger.info(f"Sending to Whisper API: {log_params}")
+
+                    transcript_response = self.client.audio.transcriptions.create(**transcribe_params)
+                    transcript_text = transcript_response.text
+                finally:
+                    audio_file.close()
 
             log_with_context(
                 logger,
@@ -120,6 +136,7 @@ class OpenAIService:
 
         except Exception as e:
             logger.error(f"Unexpected error during transcription: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             raise TranscriptionError(f"Transcription failed: {e}")
 
     def _transcribe_large_audio(
@@ -183,16 +200,30 @@ class OpenAIService:
                 )
 
                 # Transcribe chunk
-                with open(chunk_path, "rb") as chunk_file:
-                    response = self.client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=chunk_file,
-                        language=language,
-                        prompt=prompt,
-                        temperature=0,
-                    )
+                # Open file handle directly for Whisper API
+                chunk_file = open(chunk_path, "rb")
 
-                transcriptions.append(response.text)
+                try:
+                    # Build parameters, only include optional ones if provided
+                    # Note: Whisper API does NOT support temperature parameter
+                    transcribe_params = {
+                        "model": "whisper-1",
+                        "file": chunk_file,
+                    }
+                    if language:
+                        transcribe_params["language"] = language
+                    if prompt:
+                        transcribe_params["prompt"] = prompt
+
+                    # Log parameters being sent (excluding file object)
+                    log_params = {k: v for k, v in transcribe_params.items() if k != "file"}
+                    logger.info(f"Sending chunk {i + 1}/{num_chunks} to Whisper API: {log_params}")
+
+                    response = self.client.audio.transcriptions.create(**transcribe_params)
+                    transcriptions.append(response.text)
+                finally:
+                    chunk_file.close()
+
                 chunk_path.unlink()  # Delete chunk file
 
             # Concatenate transcriptions
@@ -232,3 +263,95 @@ class OpenAIService:
         )
 
         return estimated_cost
+
+    def generate_chat_completion(
+        self,
+        transcript: str,
+        user_prompt: str,
+        model: str = "gpt-4o",
+        max_tokens: int = 10000,
+        temperature: float = 0.7,
+    ) -> str:
+        """
+        Generate LLM analysis of transcript using Chat Completion API.
+
+        Args:
+            transcript: The transcript text to analyze
+            user_prompt: User's analysis instruction/question
+            model: OpenAI model to use (gpt-4o, gpt-5.4, etc.)
+            max_tokens: Maximum tokens in response
+            temperature: Creativity level (0-1)
+
+        Returns:
+            LLM response text
+
+        Raises:
+            OpenAIAPIError: If chat completion fails
+        """
+        try:
+            log_with_context(
+                logger,
+                logging.INFO,
+                "Starting chat completion",
+                model=model,
+                transcript_length=len(transcript),
+                prompt_length=len(user_prompt),
+            )
+
+            # Build messages for chat completion
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a helpful AI assistant analyzing transcripts. "
+                        "Provide clear, accurate, and insightful analysis based on "
+                        "the transcript and user's request."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Transcript:\n\n{transcript}\n\n---\n\n{user_prompt}",
+                },
+            ]
+
+            # Call OpenAI Chat Completion API
+            # Note: Newer OpenAI models use max_completion_tokens instead of max_tokens
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_completion_tokens=max_tokens,
+                temperature=temperature,
+            )
+
+            # Extract response text
+            logger.info(f"Full response object: {response}")
+            logger.info(f"Response choices: {response.choices}")
+
+            if not response.choices or not response.choices[0].message.content:
+                logger.warning("Response is empty! Full response: " + str(response))
+                raise OpenAIAPIError("Chat completion returned empty response")
+
+            response_text = response.choices[0].message.content
+
+            if not response_text or response_text.strip() == "":
+                logger.warning("Response text is empty after extraction")
+                raise OpenAIAPIError("Chat completion returned empty response text")
+
+            log_with_context(
+                logger,
+                logging.INFO,
+                "Chat completion completed",
+                model=model,
+                response_length=len(response_text),
+                tokens_used=response.usage.total_tokens if response.usage else 0,
+            )
+
+            return response_text
+
+        except APIError as e:
+            logger.error(f"OpenAI API error during chat completion: {e}")
+            raise OpenAIAPIError(f"Chat completion failed: {e}")
+
+        except Exception as e:
+            logger.error(f"Unexpected error during chat completion: {e}")
+            raise OpenAIAPIError(f"Chat completion error: {e}")

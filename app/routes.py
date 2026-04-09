@@ -1,13 +1,15 @@
 """Flask routes for audio transcription."""
 import logging
 import subprocess
+import uuid
+from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from app.forms import AudioUploadForm
+from app.forms import AudioUploadForm, AnalysisPromptForm
 from app.utils import cleanup_file, save_upload
 from src.core.exceptions import (
     AudioProcessingError,
@@ -16,8 +18,13 @@ from src.core.exceptions import (
     TranscriptionError,
 )
 from src.processors.audio_processor import AudioProcessor
+from src.services.openai_service import OpenAIService
 
 bp = Blueprint("main", __name__)
+
+# In-memory storage (replace with Redis/DB in production)
+TRANSCRIPTS = {}  # {transcript_id: {transcript, filename, file_size_mb, language, char_count, word_count, created_at}}
+ANALYSES = {}     # {analysis_id: {prompt, response, transcript_id, model, created_at}}
 
 
 def convert_m4a_to_mp3(m4a_path):
@@ -139,23 +146,41 @@ def upload():
                 )
                 return render_template("index.html", form=form), 500
 
-        # Get language if specified
-        language = form.language.data if form.language.data else None
+        # Get language if specified (only pass if non-empty)
+        language = form.language.data or None
 
         # Process audio
         processor = AudioProcessor()
-        transcript = processor.process(str(processing_file), language=language)
+
+        # Only pass language if specified
+        if language:
+            transcript = processor.process(str(processing_file), language=language)
+        else:
+            transcript = processor.process(str(processing_file))
 
         # Calculate file size for display (use original file size)
         file_size_mb = temp_file.stat().st_size / (1024 * 1024)
 
-        return render_template(
-            "result.html",
-            transcript=transcript,
-            filename=original_filename,
-            file_size_mb=f"{file_size_mb:.2f}",
-            language=language or "Auto-detected",
-        )
+        # Generate UUID for transcript
+        transcript_id = str(uuid.uuid4())
+
+        # Store transcript data in memory
+        TRANSCRIPTS[transcript_id] = {
+            'transcript': transcript,
+            'filename': original_filename,
+            'file_size_mb': f"{file_size_mb:.2f}",
+            'language': language or "Auto-detected",
+            'char_count': len(transcript),
+            'word_count': len(transcript.split()),
+            'created_at': datetime.utcnow()
+        }
+
+        # Store in session for easy access
+        session['current_transcript_id'] = transcript_id
+        session.permanent = True
+
+        flash("Transcription completed successfully!", "success")
+        return redirect(url_for("main.result", transcript_id=transcript_id))
 
     except AudioValidationError as e:
         current_app.logger.error(f"Validation error: {e}")
@@ -183,6 +208,122 @@ def upload():
             cleanup_file(temp_file)
         if converted_file:
             cleanup_file(converted_file)
+
+
+@bp.route("/result/<transcript_id>", methods=["GET"])
+@login_required
+def result(transcript_id):
+    """Display transcript and analysis form.
+
+    Args:
+        transcript_id: UUID of the transcript
+
+    Returns:
+        Rendered result page with transcript and analysis form
+    """
+    if transcript_id not in TRANSCRIPTS:
+        flash("Transcript not found. Please upload a new file.", "error")
+        return redirect(url_for("main.index"))
+
+    transcript_data = TRANSCRIPTS[transcript_id]
+    form = AnalysisPromptForm()
+
+    return render_template(
+        "result.html",
+        transcript=transcript_data['transcript'],
+        filename=transcript_data['filename'],
+        file_size_mb=transcript_data['file_size_mb'],
+        language=transcript_data['language'],
+        char_count=transcript_data['char_count'],
+        word_count=transcript_data['word_count'],
+        transcript_id=transcript_id,
+        form=form
+    )
+
+
+@bp.route("/analyze", methods=["POST"])
+@login_required
+def analyze():
+    """Process transcript analysis with LLM.
+
+    Returns:
+        Redirect to analysis page or error
+    """
+    form = AnalysisPromptForm()
+
+    if not form.validate_on_submit():
+        flash("Invalid prompt submission", "error")
+        return redirect(url_for("main.index"))
+
+    # Get transcript from session
+    transcript_id = session.get('current_transcript_id')
+    if not transcript_id or transcript_id not in TRANSCRIPTS:
+        flash("Transcript not found. Please upload a new file.", "error")
+        return redirect(url_for("main.index"))
+
+    transcript_data = TRANSCRIPTS[transcript_id]
+    user_prompt = form.prompt.data
+
+    try:
+        # Call OpenAI Chat Completion API
+        openai_service = OpenAIService()
+        llm_response = openai_service.generate_chat_completion(
+            transcript=transcript_data['transcript'],
+            user_prompt=user_prompt,
+            model='gpt-5.4'
+        )
+
+        # Store analysis
+        analysis_id = str(uuid.uuid4())
+        ANALYSES[analysis_id] = {
+            'prompt': user_prompt,
+            'response': llm_response,
+            'transcript_id': transcript_id,
+            'model': 'gpt-5.4',
+            'created_at': datetime.utcnow()
+        }
+
+        flash("Analysis completed!", "success")
+        return redirect(url_for("main.analysis", analysis_id=analysis_id))
+
+    except OpenAIAPIError as e:
+        current_app.logger.error(f"OpenAI API error: {e}")
+        flash(f"OpenAI API error: {str(e)}", "error")
+        return redirect(url_for("main.result", transcript_id=transcript_id))
+    except Exception as e:
+        current_app.logger.error(f"Analysis error: {e}")
+        flash(f"Analysis error: {str(e)}", "error")
+        return redirect(url_for("main.result", transcript_id=transcript_id))
+
+
+@bp.route("/analysis/<analysis_id>", methods=["GET"])
+@login_required
+def analysis(analysis_id):
+    """Display analysis result.
+
+    Args:
+        analysis_id: UUID of the analysis
+
+    Returns:
+        Rendered analysis page
+    """
+    if analysis_id not in ANALYSES:
+        flash("Analysis not found", "error")
+        return redirect(url_for("main.index"))
+
+    analysis_data = ANALYSES[analysis_id]
+    transcript_id = analysis_data['transcript_id']
+    transcript_data = TRANSCRIPTS.get(transcript_id, {})
+
+    return render_template(
+        "analysis.html",
+        prompt=analysis_data['prompt'],
+        response=analysis_data['response'],
+        model=analysis_data['model'],
+        transcript=transcript_data.get('transcript', ''),
+        filename=transcript_data.get('filename', ''),
+        transcript_id=transcript_id
+    )
 
 
 @bp.route("/health", methods=["GET"])

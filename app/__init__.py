@@ -81,5 +81,22 @@ def create_app(config_name="default"):
         logger.error(f"✗ Failed to import/register auth_routes: {e}", exc_info=True)
         raise
 
+    # Load application version
+    try:
+        version_file = Path(__file__).parent.parent / "VERSION"
+        if version_file.exists():
+            app.version = version_file.read_text().strip()
+        else:
+            app.version = "1.0.0"
+        logger.info(f"✓ Application version: {app.version}")
+    except Exception as e:
+        logger.error(f"✗ Failed to load version: {e}")
+        app.version = "unknown"
+
+    # Make version available to templates
+    @app.context_processor
+    def inject_version():
+        return {"app_version": app.version}
+
     logger.info("✓ App created successfully")
     return app
