@@ -8,6 +8,10 @@ A Flask-based web application that converts M4A and MP3 audio files to text tran
 - **Multiple Format Support** - MP3, M4A, WAV, WebM
 - **Large File Handling** - Automatically chunks files >25MB
 - **Language Detection** - Auto-detects language or specify manually
+- **AI-Powered Analysis** - Analyze transcripts using OpenAI's GPT-5.4 model
+  - Ask questions about the transcript
+  - Generate summaries and insights
+  - Multi-prompt support for the same transcript
 - **One-Click Download** - Download transcripts as text files
 - **Production Ready** - Error handling, validation, security
 
@@ -110,7 +114,8 @@ azure-transcription-app/
 │   ├── templates/           # HTML templates
 │   │   ├── base.html
 │   │   ├── index.html
-│   │   └── result.html
+│   │   ├── result.html
+│   │   └── analysis.html    # LLM analysis results
 │   └── static/              # CSS, JS
 │
 ├── src/                      # Reused from cikkiro
@@ -153,6 +158,41 @@ Process uploaded audio file.
 **Response:**
 - Success: Returns HTML page with transcript
 - Error: Returns error message and form
+
+### GET /result/<transcript_id>
+
+Display transcript with analysis form.
+
+**Parameters:**
+- `transcript_id` (URL param) - UUID of the transcript
+
+**Response:**
+- Returns HTML page with transcript and analysis prompt form
+
+### POST /analyze
+
+Submit transcript for LLM analysis with user prompt.
+
+**Form Data:**
+- `prompt` (required) - Analysis prompt (10-2000 characters)
+
+**Response:**
+- Success: Redirects to `/analysis/<analysis_id>` with results
+- Error: Returns error message and redirects to result page
+
+### GET /analysis/<analysis_id>
+
+Display LLM analysis results.
+
+**Parameters:**
+- `analysis_id` (URL param) - UUID of the analysis
+
+**Response:**
+- Returns HTML page with:
+  - User's prompt
+  - AI-generated response
+  - Collapsible original transcript
+  - Links to try another prompt or upload new file
 
 ### GET /health
 
@@ -321,14 +361,22 @@ Key components to modify:
 
 ## Future Enhancements
 
-- [ ] User authentication
-- [ ] Transcript history/database
+### Completed Features
+- [x] AI-Powered Analysis (GPT-5.4 integration)
+- [x] Version management system
+
+### Planned Features
+- [ ] User authentication and transcript history
+- [ ] Database integration (PostgreSQL) to replace in-memory storage
+- [ ] User-specific transcript management
 - [ ] Translation to other languages
 - [ ] Speaker diarization
 - [ ] Export to PDF/DOCX
 - [ ] Batch upload
-- [ ] Real-time progress updates
-- [ ] Custom vocabulary/prompts
+- [ ] Real-time progress updates (WebSocket)
+- [ ] Transcript search and filtering
+- [ ] Rate limiting per user
+- [ ] Analytics dashboard
 
 ## License
 
@@ -346,6 +394,10 @@ For issues, feature requests, or improvements:
 ---
 
 **Created:** 2026-04-04
+**Last Updated:** 2026-04-09
+**Current Version:** 1.0.7
 **Status:** Production Ready
 **Python Version:** 3.11+
 **Framework:** Flask 3.0.2
+
+See [CHANGELOG.md](./CHANGELOG.md) for version history and detailed changes.
