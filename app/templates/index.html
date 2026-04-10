@@ -119,14 +119,13 @@
                                 <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-12l-3.172-3.172a4 4 0 00-5.656 0L28 12M9 20H7m2 0a2 2 0 100-4 2 2 0 000 4z"></path>
                             </svg>
                             <p class="text-gray-700 font-medium mb-1">Drag and drop your audio file here</p>
-                            <p class="text-gray-500 text-sm mb-3">or click to select from your computer</p>
+                            <p class="text-gray-500 text-sm mb-3">or click to select from your device or files</p>
                         </div>
 
                         {{ form.audio_file(
                             class="file-input",
                             id="audio-file-input",
-                            accept=".mp3,.m4a,.wav,.webm",
-                            capture="microphone"
+                            accept=".mp3,.m4a,.wav,.webm"
                         ) }}
                     </div>
 
