@@ -4,7 +4,7 @@
 <div class="max-w-2xl mx-auto">
     <div class="bg-white rounded-lg shadow-md p-8">
         <h2 class="text-3xl font-bold text-gray-800 mb-2">Convert Audio to Text</h2>
-        <p class="text-gray-600 mb-6">Upload M4A or MP3 files and get instant transcriptions powered by OpenAI Whisper</p>
+        <p class="text-gray-600 mb-6">Record audio directly or upload M4A, MP3, WAV, or WebM files and get instant transcriptions powered by OpenAI Whisper</p>
 
         <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
             <p class="text-sm text-gray-700">
@@ -17,68 +17,159 @@
             </p>
         </div>
 
-        <form method="POST" action="{{ url_for('main.upload') }}" enctype="multipart/form-data" id="upload-form">
-            {{ form.hidden_tag() }}
+        <!-- Tab Navigation -->
+        <div class="flex border-b border-gray-200 mb-6 -mx-8 px-8">
+            <button id="tab-record" class="tab-button active px-6 py-3 font-medium text-blue-600 border-b-2 border-blue-600 flex items-center hover:text-blue-700 transition-colors">
+                <svg class="inline w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path>
+                </svg>
+                Record Audio
+            </button>
+            <button id="tab-upload" class="tab-button px-6 py-3 font-medium text-gray-600 border-b-2 border-transparent hover:text-blue-600 transition-colors">
+                <svg class="inline w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                </svg>
+                Upload File
+            </button>
+        </div>
 
-            <!-- File Input with Drag & Drop -->
-            <div class="mb-6">
-                {{ form.audio_file.label(class="block text-gray-700 font-semibold mb-3") }}
+        <!-- Recording Tab Content -->
+        <div id="record-panel" class="tab-panel">
+            <div class="bg-white rounded-lg shadow-md p-8 mb-6">
+                <!-- Microphone Permission -->
+                <div id="permission-request" class="text-center">
+                    <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path>
+                    </svg>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Enable Microphone</h3>
+                    <p class="text-gray-600 mb-4">Allow access to record audio directly in your browser</p>
+                    <button id="enable-mic-btn" type="button" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                        Enable Microphone
+                    </button>
+                </div>
 
-                <div id="drop-zone" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition duration-200 bg-gray-50">
-                    <div id="drop-content">
-                        <svg class="mx-auto h-12 w-12 text-gray-400 mb-2" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-12l-3.172-3.172a4 4 0 00-5.656 0L28 12M9 20H7m2 0a2 2 0 100-4 2 2 0 000 4z"></path>
-                        </svg>
-                        <p class="text-gray-700 font-medium mb-1">Drag and drop your audio file here</p>
-                        <p class="text-gray-500 text-sm mb-3">or click to select from your computer</p>
+                <!-- Recording Controls (hidden initially) -->
+                <div id="recording-controls" class="hidden">
+                    <div class="text-center mb-6">
+                        <div id="recording-timer" class="text-4xl font-mono text-gray-800 mb-2">00:00</div>
+                        <div id="recording-status" class="text-sm text-gray-600">Ready to record</div>
+                        <div id="file-size-display" class="text-xs text-gray-500 mt-1">Size: 0 MB</div>
                     </div>
 
-                    {{ form.audio_file(
-                        class="file-input",
-                        id="audio-file-input",
-                        accept=".mp3,.m4a,.wav,.webm"
+                    <!-- Waveform visualization placeholder -->
+                    <div class="bg-gray-100 rounded-lg h-24 mb-6 flex items-center justify-center overflow-hidden">
+                        <canvas id="waveform" class="w-full h-full"></canvas>
+                    </div>
+
+                    <!-- Control Buttons -->
+                    <div class="flex justify-center gap-4 mb-4">
+                        <button id="start-record-btn" type="button" class="record-btn bg-red-600 text-white p-6 rounded-full hover:bg-red-700 shadow-lg transition-transform hover:scale-105">
+                            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"></path>
+                            </svg>
+                        </button>
+                        <button id="stop-record-btn" type="button" class="hidden bg-gray-600 text-white p-6 rounded-full hover:bg-gray-700 shadow-lg transition-transform hover:scale-105">
+                            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M6 4a2 2 0 012-2h4a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2V4z"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="text-center text-sm text-gray-500">
+                        Maximum file size: 200MB
+                    </div>
+                </div>
+
+                <!-- Playback Preview (hidden initially) -->
+                <div id="playback-preview" class="hidden">
+                    <div class="bg-gray-50 rounded-lg p-6 mb-4">
+                        <h4 class="font-semibold text-gray-800 mb-3">Review Your Recording</h4>
+                        <audio id="preview-audio" controls class="w-full mb-4"></audio>
+                        <div class="flex justify-center gap-3 flex-wrap">
+                            <button id="rerecord-btn" type="button" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7 7 0 0111.601 2.566 1 1 0 11-1.885.666A5 5 0 005.999 5V3a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                                </svg>
+                                Re-record
+                            </button>
+                            <button id="use-recording-btn" type="button" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                                Use This Recording
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload File Tab Content -->
+        <div id="upload-panel" class="tab-panel hidden">
+            <form method="POST" action="{{ url_for('main.upload') }}" enctype="multipart/form-data" id="upload-form">
+                {{ form.hidden_tag() }}
+
+                <!-- File Input with Drag & Drop -->
+                <div class="mb-6">
+                    {{ form.audio_file.label(class="block text-gray-700 font-semibold mb-3") }}
+
+                    <div id="drop-zone" class="drop-zone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition duration-200 bg-gray-50">
+                        <div id="drop-content">
+                            <svg class="mx-auto h-12 w-12 text-gray-400 mb-2" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-12l-3.172-3.172a4 4 0 00-5.656 0L28 12M9 20H7m2 0a2 2 0 100-4 2 2 0 000 4z"></path>
+                            </svg>
+                            <p class="text-gray-700 font-medium mb-1">Drag and drop your audio file here</p>
+                            <p class="text-gray-500 text-sm mb-3">or click to select from your computer</p>
+                        </div>
+
+                        {{ form.audio_file(
+                            class="file-input",
+                            id="audio-file-input",
+                            accept=".mp3,.m4a,.wav,.webm",
+                            capture="microphone"
+                        ) }}
+                    </div>
+
+                    {% if form.audio_file.errors %}
+                        <p class="text-red-500 text-sm mt-2 flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18.101 12.93l-6.63-9.868A1 1 0 0010 2a1 1 0 00-.471.138L2.999 12.93a1 1 0 00.471 1.862h14.06a1 1 0 00.471-1.862z" clip-rule="evenodd"></path>
+                            </svg>
+                            {{ form.audio_file.errors[0] }}
+                        </p>
+                    {% endif %}
+
+                    <!-- File info display -->
+                    <div id="file-info" class="hidden mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <p class="text-sm"><strong>Selected file:</strong> <span id="file-name"></span></p>
+                        <p class="text-sm"><strong>File size:</strong> <span id="file-size"></span></p>
+                    </div>
+                </div>
+
+                <!-- Language Selector -->
+                <div class="mb-6">
+                    {{ form.language.label(class="block text-gray-700 font-semibold mb-3") }}
+                    {{ form.language(class="block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                    <p class="text-xs text-gray-500 mt-2">Leave blank to auto-detect the language</p>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex gap-4">
+                    {{ form.submit(
+                        class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 cursor-pointer",
+                        id="submit-btn"
                     ) }}
                 </div>
 
-                {% if form.audio_file.errors %}
-                    <p class="text-red-500 text-sm mt-2 flex items-center">
-                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M18.101 12.93l-6.63-9.868A1 1 0 0010 2a1 1 0 00-.471.138L2.999 12.93a1 1 0 00.471 1.862h14.06a1 1 0 00.471-1.862z" clip-rule="evenodd"></path>
-                        </svg>
-                        {{ form.audio_file.errors[0] }}
-                    </p>
-                {% endif %}
-
-                <!-- File info display -->
-                <div id="file-info" class="hidden mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p class="text-sm"><strong>Selected file:</strong> <span id="file-name"></span></p>
-                    <p class="text-sm"><strong>File size:</strong> <span id="file-size"></span></p>
+                <!-- Progress Indicator -->
+                <div id="progress-container" class="hidden mt-6">
+                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div id="progress-bar" class="bg-gradient-to-r from-blue-600 to-blue-700 h-3 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                    </div>
+                    <p id="progress-text" class="text-sm text-gray-600 mt-3 text-center font-medium">Uploading and processing...</p>
                 </div>
-            </div>
-
-            <!-- Language Selector -->
-            <div class="mb-6">
-                {{ form.language.label(class="block text-gray-700 font-semibold mb-3") }}
-                {{ form.language(class="block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
-                <p class="text-xs text-gray-500 mt-2">Leave blank to auto-detect the language</p>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="flex gap-4">
-                {{ form.submit(
-                    class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 cursor-pointer",
-                    id="submit-btn"
-                ) }}
-            </div>
-
-            <!-- Progress Indicator -->
-            <div id="progress-container" class="hidden mt-6">
-                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div id="progress-bar" class="bg-gradient-to-r from-blue-600 to-blue-700 h-3 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
-                </div>
-                <p id="progress-text" class="text-sm text-gray-600 mt-3 text-center font-medium">Uploading and processing...</p>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 
     <!-- Info Section -->
@@ -116,8 +207,253 @@
     </div>
 </div>
 
+<style>
+    .tab-button {
+        transition: all 0.3s ease;
+        border-bottom-width: 2px;
+    }
+
+    .tab-button.active {
+        border-bottom-color: rgb(59, 130, 246);
+        color: rgb(37, 99, 235);
+    }
+
+    .tab-panel {
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .record-btn {
+        transition: all 0.3s ease;
+    }
+
+    .record-btn:active {
+        transform: scale(0.95);
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .recording-pulse {
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .dragover {
+        border-color: rgb(59, 130, 246) !important;
+        background-color: rgb(239, 246, 255) !important;
+    }
+</style>
+
 <script>
-    // DOM elements
+    // ==================== Tab Navigation ====================
+    const tabRecord = document.getElementById('tab-record');
+    const tabUpload = document.getElementById('tab-upload');
+    const recordPanel = document.getElementById('record-panel');
+    const uploadPanel = document.getElementById('upload-panel');
+
+    tabRecord.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('record');
+    });
+
+    tabUpload.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchTab('upload');
+    });
+
+    function switchTab(tab) {
+        if (tab === 'record') {
+            recordPanel.classList.remove('hidden');
+            uploadPanel.classList.add('hidden');
+            tabRecord.classList.add('active', 'border-blue-600', 'text-blue-600');
+            tabUpload.classList.remove('active', 'border-blue-600', 'text-blue-600');
+            tabUpload.classList.add('border-transparent', 'text-gray-600');
+        } else {
+            recordPanel.classList.add('hidden');
+            uploadPanel.classList.remove('hidden');
+            tabUpload.classList.add('active', 'border-blue-600', 'text-blue-600');
+            tabRecord.classList.remove('active', 'border-blue-600', 'text-blue-600');
+            tabRecord.classList.add('border-transparent', 'text-gray-600');
+        }
+    }
+
+    // Auto-select tab based on screen size
+    if (window.innerWidth < 768) {
+        switchTab('record');  // Mobile: default to recording
+    } else {
+        switchTab('upload');  // Desktop: default to file upload
+    }
+
+    // ==================== MediaRecorder State ====================
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingStartTime = null;
+    let timerInterval = null;
+    let audioStream = null;
+    let recordedBlob = null;
+
+    const enableMicBtn = document.getElementById('enable-mic-btn');
+    const permissionRequest = document.getElementById('permission-request');
+    const recordingControls = document.getElementById('recording-controls');
+    const startRecordBtn = document.getElementById('start-record-btn');
+    const stopRecordBtn = document.getElementById('stop-record-btn');
+    const playbackPreview = document.getElementById('playback-preview');
+    const rerecordBtn = document.getElementById('rerecord-btn');
+    const useRecordingBtn = document.getElementById('use-recording-btn');
+    const recordingTimer = document.getElementById('recording-timer');
+    const recordingStatus = document.getElementById('recording-status');
+    const fileSizeDisplay = document.getElementById('file-size-display');
+    const previewAudio = document.getElementById('preview-audio');
+
+    // ==================== Microphone Permission ====================
+    enableMicBtn.addEventListener('click', async () => {
+        try {
+            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            permissionRequest.classList.add('hidden');
+            recordingControls.classList.remove('hidden');
+            recordingStatus.textContent = 'Microphone enabled. Ready to record.';
+        } catch (error) {
+            alert('Microphone access denied. Please enable microphone permissions in your browser settings.');
+            console.error('Microphone error:', error);
+        }
+    });
+
+    // ==================== Recording Controls ====================
+    startRecordBtn.addEventListener('click', () => {
+        startRecording();
+    });
+
+    stopRecordBtn.addEventListener('click', () => {
+        stopRecording();
+    });
+
+    rerecordBtn.addEventListener('click', () => {
+        playbackPreview.classList.add('hidden');
+        recordingControls.classList.remove('hidden');
+        recordedBlob = null;
+        audioChunks = [];
+    });
+
+    useRecordingBtn.addEventListener('click', () => {
+        if (recordedBlob) {
+            // Create File object from Blob
+            const fileName = `recording_${Date.now()}.webm`;
+            const file = new File([recordedBlob], fileName, { type: recordedBlob.type });
+
+            // Create DataTransfer to set file input
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            document.getElementById('audio-file-input').files = dataTransfer.files;
+
+            // Show file info
+            const fileInfoDiv = document.getElementById('file-info');
+            const fileNameSpan = document.getElementById('file-name');
+            const fileSizeSpan = document.getElementById('file-size');
+            fileNameSpan.textContent = fileName;
+            fileSizeSpan.textContent = (recordedBlob.size / (1024 * 1024)).toFixed(2) + ' MB';
+            fileInfoDiv.classList.remove('hidden');
+
+            // Switch to upload tab
+            switchTab('upload');
+
+            // Scroll to form
+            document.getElementById('upload-panel').scrollIntoView({ behavior: 'smooth' });
+        }
+    });
+
+    function startRecording() {
+        audioChunks = [];
+        recordingStartTime = Date.now();
+
+        // Configure MediaRecorder
+        const options = { mimeType: 'audio/webm' };
+
+        // Fallback for Safari
+        if (!MediaRecorder.isTypeSupported('audio/webm')) {
+            options.mimeType = 'audio/mp4';
+        }
+
+        mediaRecorder = new MediaRecorder(audioStream, options);
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+                updateFileSize();
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            recordedBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+            showPlaybackPreview(recordedBlob);
+        };
+
+        mediaRecorder.start(1000); // Collect data every second
+
+        // Update UI
+        startRecordBtn.classList.add('hidden');
+        stopRecordBtn.classList.remove('hidden');
+        recordingStatus.innerHTML = '<span class="text-red-600 font-semibold recording-pulse">⬤ Recording...</span>';
+
+        // Start timer
+        timerInterval = setInterval(updateTimer, 100);
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+
+        // Stop timer
+        clearInterval(timerInterval);
+
+        // Update UI
+        startRecordBtn.classList.remove('hidden');
+        stopRecordBtn.classList.add('hidden');
+        recordingStatus.textContent = 'Recording stopped. Review your recording below.';
+    }
+
+    function updateTimer() {
+        const elapsed = Date.now() - recordingStartTime;
+        const seconds = Math.floor(elapsed / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        recordingTimer.textContent =
+            `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function updateFileSize() {
+        const totalSize = audioChunks.reduce((acc, chunk) => acc + chunk.size, 0);
+        const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+        fileSizeDisplay.textContent = `Size: ${sizeMB} MB`;
+
+        // Check if exceeding 200MB limit
+        if (totalSize > 200 * 1024 * 1024) {
+            stopRecording();
+            alert('Recording stopped: Maximum file size (200MB) reached.');
+        }
+    }
+
+    function showPlaybackPreview(blob) {
+        recordingControls.classList.add('hidden');
+        playbackPreview.classList.remove('hidden');
+
+        const audioURL = URL.createObjectURL(blob);
+        previewAudio.src = audioURL;
+    }
+
+    // ==================== Upload File Functionality ====================
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('audio-file-input');
     const fileInfo = document.getElementById('file-info');
@@ -199,6 +535,13 @@
                 progressText.textContent = 'Finalizing transcript...';
             }
         }, 500);
+    });
+
+    // ==================== Cleanup on Page Unload ====================
+    window.addEventListener('beforeunload', () => {
+        if (audioStream) {
+            audioStream.getTracks().forEach(track => track.stop());
+        }
     });
 </script>
 {% endblock %}
