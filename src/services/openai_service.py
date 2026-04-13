@@ -14,6 +14,14 @@ from pydub import AudioSegment
 from src.core.exceptions import OpenAIAPIError, TranscriptionError
 from src.utils.logger import get_logger, log_with_context
 
+# Azure Key Vault support (optional)
+try:
+    from azure.identity import ManagedIdentityCredential, DefaultAzureCredential
+    from azure.keyvault.secrets import SecretClient
+    AZURE_KEYVAULT_AVAILABLE = True
+except ImportError:
+    AZURE_KEYVAULT_AVAILABLE = False
+
 logger = get_logger(__name__)
 
 # OpenAI Whisper API has a 25MB file size limit
@@ -28,18 +36,71 @@ class OpenAIService:
         Initialize OpenAI service.
 
         Args:
-            api_key: OpenAI API key (if None, uses OPENAI_API_KEY env var)
+            api_key: OpenAI API key (if None, uses OPENAI_API_KEY env var or Key Vault)
 
         Raises:
             OpenAIAPIError: If authentication fails
         """
         try:
-            self.client = OpenAI(api_key=api_key)
+            # Try to get API key from various sources
+            api_key_to_use = api_key or self._get_api_key()
+
+            if not api_key_to_use:
+                raise ValueError("No API key provided or found in environment/Key Vault")
+
+            self.client = OpenAI(api_key=api_key_to_use)
             logger.info("OpenAI service initialized successfully")
 
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI service: {e}")
             raise OpenAIAPIError(f"OpenAI initialization failed: {e}")
+
+    @staticmethod
+    def _get_api_key() -> Optional[str]:
+        """
+        Get API key from environment variable or Azure Key Vault.
+
+        Returns:
+            API key or None if not found
+        """
+        # Try environment variable first
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key:
+            logger.info("Using OPENAI_API_KEY from environment")
+            return api_key
+
+        # Try Azure Key Vault if configured and available
+        if not AZURE_KEYVAULT_AVAILABLE:
+            return None
+
+        keyvault_name = os.environ.get("KEYVAULT_NAME")
+        secret_name = os.environ.get("KEYVAULT_SECRET_NAME", "openai-api-key")
+
+        if not keyvault_name:
+            return None
+
+        try:
+            logger.info(f"Attempting to read API key from Key Vault: {keyvault_name}")
+
+            # Try Managed Identity first (for Azure services)
+            try:
+                credential = ManagedIdentityCredential()
+                logger.info("Using Managed Identity to access Key Vault")
+            except Exception:
+                # Fall back to DefaultAzureCredential (for local dev)
+                logger.info("Managed Identity not available, using DefaultAzureCredential")
+                credential = DefaultAzureCredential()
+
+            keyvault_url = f"https://{keyvault_name}.vault.azure.net/"
+            client = SecretClient(vault_url=keyvault_url, credential=credential)
+            secret = client.get_secret(secret_name)
+
+            logger.info(f"Successfully retrieved API key from Key Vault: {keyvault_name}")
+            return secret.value
+
+        except Exception as e:
+            logger.warning(f"Failed to retrieve API key from Key Vault: {e}")
+            return None
 
     def transcribe_audio(
         self,

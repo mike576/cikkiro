@@ -7,8 +7,12 @@ Gunicorn==21.2.0
 email-validator==2.1.0
 
 # Audio processing (from cikkiro)
-openai==2.28.0
+openai==2.30.0
 pydub==0.25.1
+
+# Azure Key Vault support (optional but recommended for production)
+azure-identity==1.15.0
+azure-keyvault-secrets==4.7.0
 
 # Utilities
 python-dotenv==1.0.0
