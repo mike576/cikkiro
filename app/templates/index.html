@@ -513,24 +513,50 @@
         }
     }
 
-    // Show progress on submit
+    // Show progress on submit with realistic file size estimation
     form.addEventListener('submit', function() {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Processing...';
         progressContainer.classList.remove('hidden');
         dropZone.classList.add('opacity-50', 'pointer-events-none');
 
-        // Simulate progress
+        // Get file size for realistic progress calculation
+        const uploadedFile = fileInput.files[0];
+        const fileSizeMB = uploadedFile ? (uploadedFile.size / (1024 * 1024)) : 0;
+
+        // Estimate upload speed and processing time
+        // Assume ~5 Mbps average upload speed (conservative)
+        const estimatedUploadTime = Math.max(5, (fileSizeMB / 5) * 1000); // milliseconds
+        const estimatedProcessingTime = Math.max(30, fileSizeMB * 4) * 1000; // ~4 seconds per MB processing
+        const totalEstimatedTime = estimatedUploadTime + estimatedProcessingTime;
+
         let progress = 0;
+        const startTime = Date.now();
+        const uploadCompleteProgress = (estimatedUploadTime / totalEstimatedTime) * 100;
+
         const interval = setInterval(() => {
-            progress += Math.random() * 20;
+            const elapsedTime = Date.now() - startTime;
+
+            // Calculate progress based on elapsed time vs estimated total time
+            progress = (elapsedTime / totalEstimatedTime) * 100;
+
+            // Cap progress at 90% until actual completion
             if (progress > 90) progress = 90;
+
             progressBar.style.width = progress + '%';
 
-            if (progress >= 85) {
+            // Update progress text based on phase
+            if (progress < uploadCompleteProgress * 0.8) {
+                progressText.textContent = `Uploading... (${Math.round(progress)}%)`;
+            } else if (progress < uploadCompleteProgress * 1.2) {
+                progressText.textContent = 'Upload complete. Transcribing audio...';
+            } else if (progress < 85) {
+                const processingPercent = Math.round(((progress - uploadCompleteProgress) / (85 - uploadCompleteProgress)) * 100);
+                progressText.textContent = `Transcribing... (${processingPercent}%)`;
+            } else {
                 progressText.textContent = 'Finalizing transcript...';
             }
-        }, 500);
+        }, 100);
     });
 
     // ==================== Cleanup on Page Unload ====================

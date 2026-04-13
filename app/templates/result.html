@@ -71,13 +71,13 @@
             Ask questions or request analysis of this transcript using GPT-5.4. You can submit multiple prompts for the same transcript.
         </p>
 
-        <form method="POST" action="{{ url_for('main.analyze') }}">
+        <form method="POST" action="{{ url_for('main.analyze') }}" id="analysis-form">
             {{ form.hidden_tag() }}
             <input type="hidden" name="transcript_id" value="{{ transcript_id }}">
 
             <div class="mb-6">
                 {{ form.prompt.label(class="block text-sm font-medium text-gray-700 mb-2") }}
-                {{ form.prompt(class="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none") }}
+                {{ form.prompt(class="block w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none", id="analysis-prompt") }}
                 {% if form.prompt.errors %}
                     <p class="mt-2 text-sm text-red-600">
                         {% for error in form.prompt.errors %}
@@ -94,7 +94,7 @@
             </div>
 
             <div>
-                {{ form.submit(class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-150 flex items-center justify-center") }}
+                {{ form.submit(class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-150 flex items-center justify-center", id="analysis-submit-btn") }}
             </div>
         </form>
     </div>
@@ -146,5 +146,31 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
+
+    // Disable Analyze button after clicking to prevent duplicate submissions
+    const analysisForm = document.getElementById('analysis-form');
+    const analysisSubmitBtn = document.getElementById('analysis-submit-btn');
+    const analysisPrompt = document.getElementById('analysis-prompt');
+
+    analysisForm.addEventListener('submit', function(e) {
+        // Prevent multiple submissions
+        analysisSubmitBtn.disabled = true;
+        analysisPrompt.disabled = true;
+
+        // Store original button text
+        const originalText = analysisSubmitBtn.textContent;
+
+        // Show loading state
+        analysisSubmitBtn.textContent = 'Analyzing... Please wait';
+        analysisSubmitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+        // Set a timeout to re-enable in case of error (30 seconds)
+        setTimeout(() => {
+            analysisSubmitBtn.disabled = false;
+            analysisPrompt.disabled = false;
+            analysisSubmitBtn.textContent = originalText;
+            analysisSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }, 30000);
+    });
 </script>
 {% endblock %}
