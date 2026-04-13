@@ -73,6 +73,7 @@
 
         <form method="POST" action="{{ url_for('main.analyze') }}">
             {{ form.hidden_tag() }}
+            <input type="hidden" name="transcript_id" value="{{ transcript_id }}">
 
             <div class="mb-6">
                 {{ form.prompt.label(class="block text-sm font-medium text-gray-700 mb-2") }}

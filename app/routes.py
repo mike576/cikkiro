@@ -255,8 +255,8 @@ def analyze():
         flash("Invalid prompt submission", "error")
         return redirect(url_for("main.index"))
 
-    # Get transcript from session
-    transcript_id = session.get('current_transcript_id')
+    # Get transcript from form data
+    transcript_id = request.form.get('transcript_id')
     if not transcript_id or transcript_id not in TRANSCRIPTS:
         flash("Transcript not found. Please upload a new file.", "error")
         return redirect(url_for("main.index"))
