@@ -153,9 +153,9 @@
     const analysisPrompt = document.getElementById('analysis-prompt');
 
     analysisForm.addEventListener('submit', function(e) {
-        // Prevent multiple submissions
+        // Prevent multiple submissions - only disable the button, NOT the prompt field
+        // (disabled fields don't get submitted with the form data)
         analysisSubmitBtn.disabled = true;
-        analysisPrompt.disabled = true;
 
         // Store original button text
         const originalText = analysisSubmitBtn.textContent;
@@ -167,7 +167,6 @@
         // Set a timeout to re-enable in case of error (30 seconds)
         setTimeout(() => {
             analysisSubmitBtn.disabled = false;
-            analysisPrompt.disabled = false;
             analysisSubmitBtn.textContent = originalText;
             analysisSubmitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }, 30000);
